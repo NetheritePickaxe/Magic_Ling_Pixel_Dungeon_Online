@@ -26,3 +26,6 @@ android/src/google-services.json
 android/src/debug/google-services.json
 android/google-services.json
 google-services.json
+
+#Harness
+.workbuddy/
