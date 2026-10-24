@@ -44,8 +44,6 @@ import com.badlogic.gdx.utils.GdxNativesLoader;
 import com.badlogic.gdx.utils.GdxRuntimeException;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.snackbar.Snackbar;
-import com.google.firebase.FirebaseApp;
-import com.google.firebase.analytics.FirebaseAnalytics;
 import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.custom.utils.CrashHandler;
@@ -72,8 +70,6 @@ public class AndroidLauncher extends AndroidApplication {
 
     private static AndroidPlatformSupport support;
 
-    public static FirebaseAnalytics mFirebaseAnalyticsRecords;
-
     @RequiresPermission(allOf = {Manifest.permission.INTERNET, Manifest.permission.ACCESS_NETWORK_STATE, Manifest.permission.WAKE_LOCK})
     @SuppressLint({"SetTextI18n", "RestrictedApi"})
     @Override
@@ -88,9 +84,6 @@ public class AndroidLauncher extends AndroidApplication {
                 .apply();
         CustomActivityOnCrash.install(this);
 
-        FirebaseApp.initializeApp(this);
-
-        mFirebaseAnalyticsRecords = FirebaseAnalytics.getInstance(this);
         try {
             GdxNativesLoader.load();
             FreeType.initFreeType();

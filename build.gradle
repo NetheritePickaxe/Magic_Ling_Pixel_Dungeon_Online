@@ -12,8 +12,7 @@ buildscript {
     dependencies {
         //noinspection AndroidGradlePluginVersion
         classpath 'com.android.tools.build:gradle:9.1.0'
-        classpath 'com.google.gms:google-services:4.4.2'
-        classpath 'com.google.firebase:firebase-crashlytics-gradle:3.0.3'
+        //Google 服务依赖包（GMS / Firebase Crashlytics）已移除，详见 README
     }
 }
 
