@@ -48,3 +48,6 @@ core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/services/analytics/A
 core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/services/analytics/AnalyticsGameData.java
 core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/services/analytics/AnalyticsService.java
 core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/services/analytics/Analytics.java
+
+#Harness
+.workbuddy/
