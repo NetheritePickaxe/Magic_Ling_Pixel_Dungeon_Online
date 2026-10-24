@@ -67,8 +67,7 @@ public class EulaScene extends PixelScene {
         acceptButton = new RedButton(Messages.get(this, "accept")) {
             @Override
             protected void onClick() {
-                SPDSettings.firebase(true);
-                SPDSettings.firebaseRecords(true);
+                SPDSettings.eula(true);
                 ShatteredPixelDungeon.switchScene(GoScene.class);
             }
 

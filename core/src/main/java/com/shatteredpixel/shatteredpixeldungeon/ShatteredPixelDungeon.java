@@ -66,7 +66,7 @@ public class ShatteredPixelDungeon extends Game {
 	public static final int v2_5_0 = 794;
 	
 	public ShatteredPixelDungeon( PlatformSupport platform ) {
-		super( sceneClass == null ? (!SPDSettings.firebase()) ? EulaScene.class : GoScene.class : sceneClass, platform );
+		super( sceneClass == null ? (!SPDSettings.eula()) ? EulaScene.class : GoScene.class : sceneClass, platform );
 
 		if(SPDSettings.isItemUnlock("avatars_huntress_4")){
 			if(!SPDSettings.isItemUnlock("skin_4_hr")){
