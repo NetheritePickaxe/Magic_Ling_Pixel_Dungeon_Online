@@ -98,6 +98,9 @@ public class SPDAction extends GameAction {
 	public static final GameAction ZOOM_OUT     = new SPDAction("zoom_out");
 	public static final GameAction QUICKSLOT_SELECTOR   = new SPDAction("quickslot_selector");
 
+	//桌面端隐藏/显示 HUD（默认 F10，可在键位设置中自定义）
+	public static final GameAction TOGGLE_HUD   = new SPDAction("toggle_hud");
+
 	private static final LinkedHashMap<Integer, GameAction> defaultBindings = new LinkedHashMap<>();
 	static {
 		defaultBindings.put( Input.Keys.ESCAPE,         SPDAction.BACK );
@@ -168,6 +171,8 @@ public class SPDAction extends GameAction {
 		defaultBindings.put( Input.Keys.EQUALS,         SPDAction.ZOOM_IN );
 		defaultBindings.put( Input.Keys.MINUS,          SPDAction.ZOOM_OUT );
 		defaultBindings.put( Input.Keys.T,          SPDAction.QUICKSLOT_SELECTOR);
+
+		defaultBindings.put( Input.Keys.F10,        SPDAction.TOGGLE_HUD );
 	}
 
 	public static LinkedHashMap<Integer, GameAction> getDefaults() {

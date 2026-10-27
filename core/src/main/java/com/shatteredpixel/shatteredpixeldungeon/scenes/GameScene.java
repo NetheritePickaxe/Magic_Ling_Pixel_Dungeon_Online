@@ -38,6 +38,7 @@ import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.GamesInProgress;
 import com.shatteredpixel.shatteredpixeldungeon.PaswordBadges;
 import com.shatteredpixel.shatteredpixeldungeon.Rankings;
+import com.shatteredpixel.shatteredpixeldungeon.SPDAction;
 import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
@@ -180,6 +181,8 @@ import com.shatteredpixel.shatteredpixeldungeon.windows.WndResurrect;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndStory;
 import com.watabou.glwrap.Blending;
 import com.watabou.input.ControllerHandler;
+import com.watabou.input.KeyBindings;
+import com.watabou.input.KeyEvent;
 import com.watabou.input.PointerEvent;
 import com.watabou.noosa.Camera;
 import com.watabou.noosa.Game;
@@ -200,6 +203,7 @@ import com.watabou.utils.Point;
 import com.watabou.utils.PointF;
 import com.watabou.utils.Random;
 import com.watabou.utils.RectF;
+import com.watabou.utils.Signal;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -265,26 +269,30 @@ public class GameScene extends PixelScene {
 	public static void endIntro(){
 		if (scene != null){
 			SPDSettings.intro(false);
-			scene.add(new Tweener(scene, 2f){
-				@Override
-				protected void updateValues(float progress) {
-					if (progress <= 0.5f) {
-						scene.status.alpha(2*progress);
-						scene.status.visible = scene.status.active = true;
-						scene.toolbar.visible = scene.toolbar.active = false;
-						if (scene.inventory != null) scene.inventory.visible = scene.inventory.active = false;
-					} else {
-						scene.status.alpha(1f);
-						scene.status.visible = scene.status.active = true;
-						scene.toolbar.alpha((progress - 0.5f)*2);
-						scene.toolbar.visible = scene.toolbar.active = true;
-						if (scene.inventory != null){
-							scene.inventory.visible = scene.inventory.active = true;
-							scene.inventory.alpha((progress - 0.5f)*2);
+			//玩家主动隐藏了控件时不执行入场动画，保持隐藏状态
+			if (!SPDSettings.HideScreen()) {
+				Group activeToolbar = activeToolbar();
+				scene.add(new Tweener(scene, 2f){
+					@Override
+					protected void updateValues(float progress) {
+						if (progress <= 0.5f) {
+							scene.status.alpha(2*progress);
+							scene.status.visible = scene.status.active = true;
+							activeToolbar.visible = activeToolbar.active = false;
+							if (scene.inventory != null) scene.inventory.visible = scene.inventory.active = false;
+						} else {
+							scene.status.alpha(1f);
+							scene.status.visible = scene.status.active = true;
+							setToolbarAlpha(activeToolbar, (progress - 0.5f)*2);
+							activeToolbar.visible = activeToolbar.active = true;
+							if (scene.inventory != null){
+								scene.inventory.visible = scene.inventory.active = true;
+								scene.inventory.alpha((progress - 0.5f)*2);
+							}
 						}
 					}
-				}
-			});
+				});
+			}
 			GameLog.wipe();
 			if (SPDSettings.interfaceSize() == 0){
 				GLog.p(Messages.get(GameScene.class, "tutorial_ui_mobile"));
@@ -322,6 +330,56 @@ public class GameScene extends PixelScene {
 					Dungeon.level.discover(i);
 					discoverTile(i, Terrain.SECRET_DOOR);
 				}
+			}
+		}
+	}
+
+	//quickSwapper 设置可能在游戏内被切换，此时按设置选取并回退到实际存在的那个工具栏
+	private static Group activeToolbar(){
+		if (scene == null) return null;
+		if (SPDSettings.quickSwapper()){
+			return scene.toolbarv1 != null ? (Group) scene.toolbarv1 : (Group) scene.toolbar;
+		} else {
+			return scene.toolbar != null ? (Group) scene.toolbar : (Group) scene.toolbarv1;
+		}
+	}
+
+	//只有 ToobarV 实现了 alpha 渐隐，Toolbar(v1) 无需处理
+	private static void setToolbarAlpha(Group toolbar, float alpha){
+		if (toolbar instanceof ToobarV) ((ToobarV) toolbar).alpha(alpha);
+	}
+
+	public static void toggleHud(){
+		if (scene == null) return;
+		SPDSettings.HideScreen(!SPDSettings.HideScreen());
+		applyHudVisibility(SPDSettings.HideScreen());
+	}
+
+	//隐藏/显示 HUD（状态栏、工具栏、物品栏），菜单栏始终保留以便随时进入设置恢复
+	public static void applyHudVisibility(boolean hide){
+		if (scene == null) return;
+		scene.status.visible = scene.status.active = !hide;
+		scene.status.alpha(1f);
+		Group activeToolbar = activeToolbar();
+		if (activeToolbar != null){
+			activeToolbar.visible = activeToolbar.active = !hide;
+			setToolbarAlpha(activeToolbar, 1f);
+		}
+		if (scene.inventory != null){
+			scene.inventory.visible = scene.inventory.active = !hide && invVisible;
+			scene.inventory.alpha(1f);
+			//工具栏位置必须与物品栏可见状态保持一致，避免“工具栏停在展开位、物品栏却没显示”的错位
+			float invTop = scene.inventory.top();
+			if (SPDSettings.quickSwapper()){
+				if (scene.inventory.visible)
+					scene.toolbarv1.setPos(scene.toolbarv1.left(), invTop - scene.toolbarv1.height());
+				else
+					scene.toolbarv1.setPos(scene.toolbarv1.left(), uiCamera.height - scene.toolbarv1.height());
+			} else {
+				if (scene.inventory.visible)
+					scene.toolbar.setPos(scene.toolbar.left(), invTop - scene.toolbar.height());
+				else
+					scene.toolbar.setPos(scene.toolbar.left(), uiCamera.height - scene.toolbar.height());
 			}
 		}
 	}
@@ -374,6 +432,7 @@ public class GameScene extends PixelScene {
 
 	private ToobarV toolbar;
 	private Toolbar toolbarv1;
+	private Signal.Listener<KeyEvent> hudListener;
 	private Toast prompt;
 
 	private AttackIndicator attack;
@@ -472,6 +531,11 @@ public class GameScene extends PixelScene {
 	}
 
 	public void destroy() {
+
+		if (hudListener != null){
+			KeyEvent.removeKeyListener(hudListener);
+			hudListener = null;
+		}
 
 		//tell the actor thread to finish, then wait for it to complete any actions it may be doing.
 		if (!DeviceCompat.isWeb()) {
@@ -767,7 +831,12 @@ public class GameScene extends PixelScene {
 	@Override
 	protected void onBackPressed() {
 		if (!cancel()) {
-			add( new WndGame() );
+			//手机端没有键盘，用系统返回键切换控件显示（显示时隐藏、隐藏时恢复）；菜单仍可通过左上角菜单按钮打开
+			if (!DeviceCompat.isDesktop()) {
+				toggleHud();
+			} else {
+				add( new WndGame() );
+			}
 		}
 	}
 
@@ -2020,6 +2089,18 @@ public class GameScene extends PixelScene {
 			}
 		}
 
+	//桌面端按「隐藏/显示控件」动作（默认 F10，可在键位设置中修改）切换 HUD
+	if (DeviceCompat.isDesktop() && hudListener == null){
+		KeyEvent.addKeyListener(hudListener = new Signal.Listener<KeyEvent>() {
+			@Override
+			public boolean onSignal(KeyEvent keyEvent) {
+				if (keyEvent.pressed && KeyBindings.getActionForKey(keyEvent) == SPDAction.TOGGLE_HUD){
+					toggleHud();
+					return true;
+				}
+				return false;
+			}
+		});
 	}
 
 	//todo 移除Debuff AND GoodBuff
