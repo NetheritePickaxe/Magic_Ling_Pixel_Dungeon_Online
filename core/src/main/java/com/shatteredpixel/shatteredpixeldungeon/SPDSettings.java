@@ -1462,4 +1462,13 @@ public class SPDSettings extends GameSettings {
 		return getInt(KEY_QUICKSLOT_SKILL_MODE, 0, 0, 1);
 	}
 
+	// 更新镜像站索引，0=自动（依次尝试），其余对应 GitHubUpdates.MIRRORS
+	private static final String KEY_UPDATE_MIRROR = "update_mirror";
+	public static void updateMirror(int value) {
+		put(KEY_UPDATE_MIRROR, value);
+	}
+	public static int updateMirror() {
+		return getInt(KEY_UPDATE_MIRROR, 0, 0, 32);
+	}
+
 }

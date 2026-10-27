@@ -202,10 +202,10 @@ public class MLChangesButton extends StyledButton {
 				}
 				@Override
 				protected void onClick() {
-					if(Objects.equals(update.URL1, "null") && !downloadSuccess){
-						ShatteredPixelDungeon.scene().add( new WndError( Messages.get(MLChangesButton.class, "null") ) );
-					} else if(DeviceCompat.isDesktop()){
+					if(DeviceCompat.isDesktop() && !Objects.equals(update.URL3, "null")){
 						ShatteredPixelDungeon.platform.openURI( update.URL3 );
+					} else if(Objects.equals(update.URL1, "null") && !downloadSuccess){
+						ShatteredPixelDungeon.scene().add( new WndError( Messages.get(MLChangesButton.class, "null") ) );
 					} else if (!downloadSuccess) {
 						if(downloadFailure) downloadFailure = false;
 						Game.platform.updateGame(update.URL1, listener);

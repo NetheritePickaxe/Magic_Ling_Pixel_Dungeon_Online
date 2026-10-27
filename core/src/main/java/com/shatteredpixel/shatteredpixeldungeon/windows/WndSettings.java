@@ -48,6 +48,8 @@ import com.shatteredpixel.shatteredpixeldungeon.ui.RenderedTextBlock;
 import com.shatteredpixel.shatteredpixeldungeon.ui.ToobarV;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Toolbar;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Window;
+import com.shatteredpixel.shatteredpixeldungeon.update.GitHubUpdates;
+import com.shatteredpixel.shatteredpixeldungeon.update.Updates;
 import com.shatteredpixel.shatteredpixeldungeon.utils.DungeonSeed;
 import com.watabou.noosa.ColorBlock;
 import com.watabou.noosa.Game;
@@ -1271,6 +1273,7 @@ public class WndSettings extends WndTabbed {
 		CheckBox chkNews;
 		CheckBox chkBetas;
 		CheckBox chkWifi;
+		RedButton btnMirror;
 
 		@Override
 		protected void createChildren() {
@@ -1280,6 +1283,19 @@ public class WndSettings extends WndTabbed {
 
 			sep1 = new ColorBlock(1, 1, 0xFF000000);
 			add(sep1);
+
+			btnMirror = new RedButton(mirrorLabel()){
+				@Override
+				protected void onClick() {
+					int next = SPDSettings.updateMirror() + 1;
+					if (next >= GitHubUpdates.MIRRORS.length) next = 0;
+					SPDSettings.updateMirror(next);
+					text(mirrorLabel());
+					Updates.clearUpdate();
+					Updates.checkForUpdate();
+				}
+			};
+			add(btnMirror);
 
 			chkNews = new CheckBox(Messages.get(this, "news")){
 				@Override
@@ -1305,6 +1321,14 @@ public class WndSettings extends WndTabbed {
 			}
 		}
 
+		private String mirrorLabel() {
+			int index = SPDSettings.updateMirror();
+			String name = (index > 0 && index < GitHubUpdates.MIRRORS.length)
+					? GitHubUpdates.MIRRORS[index][0]
+					: Messages.get(this, "mirror_auto");
+			return Messages.get(this, "update_mirror") + ": " + name;
+		}
+
 		@Override
 		protected void layout() {
 			title.setPos((width - title.width())/2, y + GAP);
@@ -1313,10 +1337,13 @@ public class WndSettings extends WndTabbed {
 
 			float pos;
 
+			btnMirror.setRect(0, sep1.y + 1 + GAP, width, BTN_HEIGHT);
+			pos = btnMirror.bottom();
+
 			if (width > 200){
-				chkNews.setRect(0, sep1.y + 1 + GAP, width/2-1, BTN_HEIGHT);
+				chkNews.setRect(0, pos + GAP, width/2-1, BTN_HEIGHT);
 			} else {
-				chkNews.setRect(0, sep1.y + 1 + GAP, width, BTN_HEIGHT);
+				chkNews.setRect(0, pos + GAP, width, BTN_HEIGHT);
 			}
 
 			pos = chkNews.bottom();
