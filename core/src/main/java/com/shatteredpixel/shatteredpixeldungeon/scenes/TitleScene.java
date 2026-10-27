@@ -21,6 +21,7 @@ import com.shatteredpixel.shatteredpixeldungeon.effects.Flare;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.services.news.News;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.GudaziSprite;
+import com.shatteredpixel.shatteredpixeldungeon.lan.LanHooks;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Archs;
 import com.shatteredpixel.shatteredpixeldungeon.ui.EndButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.IconButton;
@@ -452,7 +453,7 @@ public class TitleScene extends PixelScene {
 		btnAbout.icon(new Image(Icons.get(Icons.SHPX)));
 		add(btnAbout);
 
-		StyledButton seed = new SeedButton(landscape() ? Chrome.Type.GREY_BUTTON_TR : Chrome.Type.BLANK, Messages.get(this, "seed"));
+		StyledButton seed = new SeedButton(Chrome.Type.BLANK, Messages.get(this, "seed"));
 		seed.icon(NetIcons.get(NetIcons.CHAT));
 		add(seed);
 
@@ -464,8 +465,16 @@ public class TitleScene extends PixelScene {
 		btnErrors.icon(new Image(Icons.get(Icons.DISPLAY)));
 		add(btnErrors);
 
+		StyledButton btnLan = null;
+		if (LanHooks.installed()) {
+			btnLan = LanHooks.get().createTitleButton();
+			if (btnLan != null) add( btnLan );
+		}
+
 		final int BTN_HEIGHT = 20;
-		int GAP = (int)(h - topRegion - (landscape() ? 3 : 4) * BTN_HEIGHT) / 3;
+		//联机按钮：横屏与「进入地牢」等分 1/2，竖屏在下方独占一行、同宽
+		int rows = landscape() ? 3 : (btnLan == null ? 4 : 5);
+		int GAP = (int)(h - topRegion - rows * BTN_HEIGHT) / 3;
 		GAP /= landscape() ? 3 : 5;
 		GAP = Math.max(GAP, 2);
 
@@ -478,19 +487,32 @@ public class TitleScene extends PixelScene {
 		add( version );
 
 		if (landscape()) {
-			btnPlay.setRect(title.x - 50, topRegion + GAP, title.width() + 100 - 1, BTN_HEIGHT);
+			float rowWidth = title.width() + 100 - 1;
+			float colW = rowWidth * 0.332f - 1;
+			float halfRow = rowWidth / 2 - 1;
+			btnPlay.setRect(title.x - 50, topRegion + GAP, halfRow, BTN_HEIGHT);
 			align(btnPlay);
-			btnRankings.setRect(btnPlay.left(), btnPlay.bottom()+ GAP, (btnPlay.width() * 0.332f) - 1, BTN_HEIGHT);
-			btnBadges.setRect(btnRankings.left(), btnRankings.bottom()+GAP, btnRankings.width(), BTN_HEIGHT);
-			btnSupport.setRect(btnRankings.right() + 2, btnRankings.top(), btnRankings.width(), BTN_HEIGHT);
-			btnChanges.setRect(btnSupport.left(), btnSupport.bottom() + GAP, btnRankings.width(), BTN_HEIGHT);
-			btnSettings.setRect(btnSupport.right() + 2, btnSupport.top(), btnRankings.width(), BTN_HEIGHT);
-			btnAbout.setRect(btnSettings.left(), btnSettings.bottom() + GAP, btnRankings.width(), BTN_HEIGHT);
-			btnNews.setRect(btnPlay.left(), btnAbout.bottom() + GAP, btnAbout.width() + 39, BTN_HEIGHT);
-			btnErrors.setRect(btnNews.right() + 2, btnNews.top(), btnNews.width(), BTN_HEIGHT);
-			seed.setRect(0, 0,40,20);
+			if (btnLan != null) {
+				btnLan.setRect(btnPlay.right() + 2, btnPlay.top(), halfRow, BTN_HEIGHT);
+				align(btnLan);
+			}
 
+			// 排行榜 / 徽章 / 关于 一行三列
+			btnRankings.setRect(btnPlay.left(), btnPlay.bottom()+ GAP, colW, BTN_HEIGHT);
+			btnBadges.setRect(btnRankings.right() + 2, btnRankings.top(), colW, BTN_HEIGHT);
+			btnAbout.setRect(btnBadges.right() + 2, btnBadges.top(), colW, BTN_HEIGHT);
+
+			// 支持 / 更新日志 / 设置 一行三列
+			btnSupport.setRect(btnRankings.left(), btnRankings.bottom()+GAP, colW, BTN_HEIGHT);
+			btnChanges.setRect(btnSupport.right() + 2, btnSupport.top(), colW, BTN_HEIGHT);
+			btnSettings.setRect(btnChanges.right() + 2, btnChanges.top(), colW, BTN_HEIGHT);
+
+			// 游戏新闻 + 材质包 等分 1/2（与进入地牢/多人游戏同款布局）
+			btnNews.setRect(btnSupport.left(), btnSupport.bottom() + GAP, halfRow, BTN_HEIGHT);
+			btnErrors.setRect(btnNews.right() + 2, btnNews.top(), halfRow, BTN_HEIGHT);
 			align(btnNews);
+
+			seed.setRect(0, 0,40,20);
 		}
 		else {
 			seed.setRect(0, version.y-10,40,20);
@@ -504,6 +526,10 @@ public class TitleScene extends PixelScene {
 			btnAbout.setRect(btnSettings.right() + 2, btnSettings.top(), btnSettings.width(), BTN_HEIGHT);
 			btnNews.setRect(btnPlay.left(), btnAbout.bottom() + GAP, btnAbout.width(), BTN_HEIGHT);
 			btnErrors.setRect(btnNews.right() + 2, btnNews.top(), btnNews.width(), BTN_HEIGHT);
+			if (btnLan != null) {
+				btnLan.setRect(btnPlay.left(), btnErrors.bottom() + GAP, btnPlay.width(), BTN_HEIGHT);
+				align(btnLan);
+			}
 			align(btnNews);
 		}
 

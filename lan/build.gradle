@@ -1,0 +1,9 @@
+apply plugin: 'java-library'
+
+[compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
+sourceCompatibility = targetCompatibility = appJavaCompatibility
+
+dependencies {
+	//单向依赖：:lan 复用 core 的 Hero/Level/Bundle/UI，core 不认识 :lan
+	api project(':core')
+}

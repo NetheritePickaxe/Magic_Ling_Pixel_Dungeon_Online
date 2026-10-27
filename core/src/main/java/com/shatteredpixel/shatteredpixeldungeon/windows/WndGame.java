@@ -41,6 +41,7 @@ import com.shatteredpixel.shatteredpixeldungeon.scenes.RankingsScene;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.TitleScene;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSprite;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSpriteSheet;
+import com.shatteredpixel.shatteredpixeldungeon.lan.LanHooks;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Icons;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RedButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Window;
@@ -172,6 +173,8 @@ public class WndGame extends Window {
 			}
 		});
 		curBtn.icon(new ItemSprite(ItemSpriteSheet.CHEST));
+
+		if (LanHooks.installed()) LanHooks.get().addGameMenuButtons(this::addButton);
 
 		// Challenges window
 		if (Dungeon.challenges > 0) {

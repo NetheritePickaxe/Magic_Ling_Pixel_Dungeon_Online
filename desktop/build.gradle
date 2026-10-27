@@ -114,6 +114,7 @@ runtime {
 
 dependencies {
     implementation project(':core')
+    implementation project(':lan')
 
     implementation "com.badlogicgames.gdx:gdx-freetype:$gdxVersion"
     implementation "com.badlogicgames.gdx:gdx-backend-lwjgl3:$gdxVersion"

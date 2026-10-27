@@ -237,6 +237,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.spdtomlpd.Bre
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.spdtomlpd.TreeList;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.MissileWeapon;
 import com.shatteredpixel.shatteredpixeldungeon.journal.Document;
+import com.shatteredpixel.shatteredpixeldungeon.lan.LanHooks;
 import com.shatteredpixel.shatteredpixeldungeon.journal.Notes;
 import com.shatteredpixel.shatteredpixeldungeon.levels.AncientMysteryCityBossLevel;
 import com.shatteredpixel.shatteredpixeldungeon.levels.AncientMysteryCityLevel;
@@ -2419,6 +2420,11 @@ public class Hero extends Char {
 	}
 
 	public void rest( boolean fullRest ) {
+
+		if (LanHooks.installed() && LanHooks.get().interceptHeroRest(this, fullRest)) {
+			return;
+		}
+
 		spendAndNextConstant( TIME_TO_REST );
 		if (hasTalent(Talent.HOLD_FAST)){
 			Buff.affect(this, HoldFast.class).pos = pos;

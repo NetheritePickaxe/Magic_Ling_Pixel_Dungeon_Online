@@ -101,6 +101,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfSun;
 import com.shatteredpixel.shatteredpixeldungeon.journal.Document;
 import com.shatteredpixel.shatteredpixeldungeon.journal.Journal;
 import com.shatteredpixel.shatteredpixeldungeon.journal.Notes;
+import com.shatteredpixel.shatteredpixeldungeon.lan.LanHooks;
 import com.shatteredpixel.shatteredpixeldungeon.levels.AncientMysteryCityBossLevel;
 import com.shatteredpixel.shatteredpixeldungeon.levels.ColdChestBossLevel;
 import com.shatteredpixel.shatteredpixeldungeon.levels.DwarfGeneralBossLevel;
@@ -537,6 +538,8 @@ public class GameScene extends PixelScene {
 			hudListener = null;
 		}
 
+		if (LanHooks.installed()) LanHooks.get().onSceneDestroyed(this);
+
 		//tell the actor thread to finish, then wait for it to complete any actions it may be doing.
 		if (!DeviceCompat.isWeb()) {
 			if (!waitForActorThread(4500, true)) {
@@ -594,6 +597,9 @@ public class GameScene extends PixelScene {
 	//sometimes UI changes can be prompted by the actor thread.
 	// We queue any removed element destruction, rather than destroying them in the actor thread.
 	private ArrayList<Gizmo> toDestroy = new ArrayList<>();
+
+	//联机模式下的物品堆 sprite 追踪，用于增量重建
+	private final ArrayList<ItemSprite> lanHeapSprites = new ArrayList<>();
 
 	//the actor thread processes at a maximum of 60 times a second
 	//this caps the speed of resting for higher refresh rate displays
@@ -681,6 +687,8 @@ public class GameScene extends PixelScene {
 			InventoryPane.refresh();
 		}
 
+		if (LanHooks.installed()) LanHooks.get().onFrame(this);
+
 		if (Dungeon.hero == null || scene == null) {
 			return;
 		}
@@ -691,7 +699,10 @@ public class GameScene extends PixelScene {
 
 		if (!Emitter.freezeEmitters) water.offset( 0, -5 * Game.elapsed );
 
-		if (!Actor.processing() && Dungeon.hero.isAlive()) {
+		//联机房客端：世界状态完全由主机事件驱动，不启动本地逻辑线程
+		boolean localActorThread = !(LanHooks.installed() && LanHooks.get().suppressActorThread());
+
+		if (localActorThread && !Actor.processing() && Dungeon.hero.isAlive()) {
 			if (actorThread == null || !actorThread.isAlive()) {
 				actorThread = new Thread() {
 					@Override
@@ -842,6 +853,59 @@ public class GameScene extends PixelScene {
 
 	public void addCustomTile( CustomTilemap visual){
 		customTiles.add( visual.create() );
+	}
+
+	// ------------------------------------------------------------------ 联机辅助
+	// 以下方法只供 LanHooks 的实现方（:lan 模块）使用，单机流程不会调用。
+
+	/** 为不在 level.mobs 中的角色（例如远端玩家）挂载 sprite */
+	public void lanAddCharSprite( Char ch ) {
+		if (ch == null) return;
+		if (ch.sprite == null) {
+			if (ch instanceof Mob) {
+				CharSprite created = ((Mob) ch).sprite();
+				if (created == null) return;
+				created.link( ch );
+			} else {
+				return;
+			}
+		}
+		ch.sprite.visible = Dungeon.level.heroFOV[ch.pos];
+		synchronized (mobs) {
+			if (ch.sprite.parent == null) mobs.add( ch.sprite );
+		}
+	}
+
+	/** 移除某个角色的 sprite（远端玩家离开/死亡后清理） */
+	public void lanRemoveCharSprite( Char ch ) {
+		if (ch == null || ch.sprite == null) return;
+		CharSprite s = ch.sprite;
+		synchronized (mobs) {
+			mobs.remove( s );
+		}
+		s.killAndErase();
+	}
+
+	/** 按 Dungeon.level.heaps 重建当前层的物品堆 sprite */
+	public void lanRebuildHeaps() {
+		synchronized (heaps) {
+			for (ItemSprite s : lanHeapSprites) {
+				heaps.remove( s );
+				s.killAndErase();
+			}
+			lanHeapSprites.clear();
+			for (Heap heap : Dungeon.level.heaps.valueList()) {
+				addHeapSprite( heap );
+				if (heap.sprite != null) lanHeapSprites.add( (ItemSprite)heap.sprite );
+			}
+		}
+	}
+
+	/** 刷新地形特征（陷阱/植物）与地图贴图，用于房客端接收地图增量后重绘 */
+	public void lanRefreshTerrain() {
+		updateMap();
+		if (terrainFeatures != null) terrainFeatures.updateMap();
+		if (wallBlocking != null) wallBlocking.updateMap();
 	}
 
 	public void addCustomWall( CustomTilemap visual){
@@ -2104,6 +2168,10 @@ public class GameScene extends PixelScene {
 		});
 	}
 
+	if (LanHooks.installed()) LanHooks.get().onSceneCreated(this);
+
+}
+
 	//todo 移除Debuff AND GoodBuff
 	public static void cure( Char ch ) {
 		Buff.detach( ch, BlessGoodSTR.class );
@@ -2571,6 +2639,9 @@ public class GameScene extends PixelScene {
 	private static final CellSelector.Listener defaultCellListener = new CellSelector.Listener() {
 		@Override
 		public void onSelect( Integer cell ) {
+			if (LanHooks.installed() && LanHooks.get().interceptCellSelect(cell)) {
+				return;
+			}
 			if (Dungeon.hero.handle( cell )) {
 				Dungeon.hero.next();
 			}

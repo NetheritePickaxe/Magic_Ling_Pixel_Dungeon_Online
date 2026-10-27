@@ -27,6 +27,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Blob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.custom.utils.GameAPI;
+import com.shatteredpixel.shatteredpixeldungeon.lan.LanHooks;
 import com.watabou.noosa.Game;
 import com.watabou.utils.Bundlable;
 import com.watabou.utils.Bundle;
@@ -101,6 +102,12 @@ public abstract class Actor implements Bundlable {
 
 	public void timeToNow() {
 		time = now;
+	}
+
+	/** 联机局部回合制专用：把时间轴整体平移，保持 cooldown 不变；已挂起的 actor 不平移 */
+	public void shiftTime( float delta ) {
+		if (time == Float.MAX_VALUE || delta == 0f) return;
+		time += delta;
 	}
 	
 	protected void diactivate() {
@@ -191,6 +198,7 @@ public abstract class Actor implements Bundlable {
 			Statistics.duration += min;
 		}
 		now -= min;
+		if (LanHooks.installed()) LanHooks.get().onActorTimeFixed( min );
 	}
 	
 	public static void init() {
@@ -254,8 +262,13 @@ public abstract class Actor implements Bundlable {
 			if (!interrupted && !Game.switchingScene()) {
 				float earliest = Float.MAX_VALUE;
 
+				LanHooks lanHooks = LanHooks.installed() ? LanHooks.get() : null;
+				if (lanHooks != null) lanHooks.beforeActorSelection();
+
 				for (Actor actor : all) {
-					
+
+					if (lanHooks != null && !lanHooks.isActorSchedulable( actor )) continue;
+
 					//some actors will always go before others if time is equal.
 					if (actor.time < earliest ||
 							actor.time == earliest && (current == null || actor.actPriority > current.actPriority)) {

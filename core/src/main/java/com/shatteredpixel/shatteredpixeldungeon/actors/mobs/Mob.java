@@ -86,6 +86,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.MissileWea
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.darts.Dart;
 import com.shatteredpixel.shatteredpixeldungeon.journal.Bestiary;
 import com.shatteredpixel.shatteredpixeldungeon.journal.Notes;
+import com.shatteredpixel.shatteredpixeldungeon.lan.LanHooks;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.levels.features.Chasm;
@@ -764,6 +765,9 @@ public abstract class Mob extends Char {
 				}
 
             }
+
+			//多人模式：其它玩家同样是可攻击目标
+			if (LanHooks.installed()) LanHooks.get().addExtraTargets(enemies, this);
 
 			//do not target anything that's charming us
 			Charm charm = buff( Charm.class );

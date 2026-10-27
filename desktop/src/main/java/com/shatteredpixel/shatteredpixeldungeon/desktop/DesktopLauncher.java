@@ -13,6 +13,8 @@ import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.custom.seedfinder.SeedFinderCoordinator;
 import com.shatteredpixel.shatteredpixeldungeon.custom.utils.CrashHandler;
+import com.shatteredpixel.shatteredpixeldungeon.lan.LanBridge;
+import com.shatteredpixel.shatteredpixeldungeon.lan.LanHooks;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.BackupSaveScene;
 import com.shatteredpixel.shatteredpixeldungeon.services.news.News;
@@ -207,6 +209,9 @@ public class DesktopLauncher {
 
 		config.setWindowIcon("icons/icon_16.png", "icons/icon_32.png", "icons/icon_48.png",
 				"icons/icon_64.png", "icons/icon_128.png", "icons/icon_256.png");
+
+		//桌面端联机：装配唯一的桥接实现，之后所有联机行为都由 :lan 内部完成
+		LanHooks.install(new LanBridge());
 
 		new Lwjgl3Application(new ShatteredPixelDungeon(new DesktopPlatformSupport()), config);
 	}

@@ -42,6 +42,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.MissileWea
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.darts.Dart;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.darts.TippedDart;
 import com.shatteredpixel.shatteredpixeldungeon.journal.Catalog;
+import com.shatteredpixel.shatteredpixeldungeon.lan.LanHooks;
 import com.shatteredpixel.shatteredpixeldungeon.journal.Notes;
 import com.shatteredpixel.shatteredpixeldungeon.mechanics.Ballistica;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
@@ -276,6 +277,10 @@ public class Item implements Bundlable {
 	}
 	
 	public void execute( Hero hero, String action ) {
+
+		if (LanHooks.installed() && LanHooks.get().interceptItemExecute(hero, this, action)) {
+			return;
+		}
 
 		GameScene.cancel();
 		curUser = hero;
