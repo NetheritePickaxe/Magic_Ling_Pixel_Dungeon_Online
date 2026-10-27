@@ -786,7 +786,7 @@ public class HeroSelectScene extends PixelScene {
 		btnExit = new ExitButton();
 		btnExit.setPos( Camera.main.width - btnExit.width(), 0 );
 		add( btnExit );
-		btnExit.visible = !SPDSettings.intro() || Rankings.INSTANCE.totalNumber > 0;
+		btnExit.visible = !SPDSettings.intro() || GamesInProgress.firstEmpty() != 1 || Rankings.INSTANCE.totalNumber > 0;
 		if (landscape()) {
 			Image title = new Image(GameRules.BannersRules(), 0, 0, 126, 90);
 
@@ -857,6 +857,10 @@ public class HeroSelectScene extends PixelScene {
 	@Override
 	public void update() {
 		super.update();
+		//与上游一致：有完成记录的玩家清除可能残留的 intro 标志
+		if (SPDSettings.intro() && Rankings.INSTANCE.totalNumber > 0){
+			SPDSettings.intro(false);
+		}
 		boolean shouldShowGrass = heroClass().GetSkin() < 4;
 		for (GrassPatch patch : grassPatches) {
 			if (patch != null) {

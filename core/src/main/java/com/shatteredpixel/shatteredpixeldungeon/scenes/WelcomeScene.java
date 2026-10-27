@@ -24,6 +24,7 @@ package com.shatteredpixel.shatteredpixeldungeon.scenes;
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Badges;
 import com.shatteredpixel.shatteredpixeldungeon.Chrome;
+import com.shatteredpixel.shatteredpixeldungeon.GamesInProgress;
 import com.shatteredpixel.shatteredpixeldungeon.Rankings;
 import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
@@ -145,11 +146,15 @@ public class WelcomeScene extends PixelScene {
 		StyledButton okay = new StyledButton(Chrome.Type.GREY_BUTTON_TR, Messages.get(this, "continue")){
 			@Override
 			protected void onClick() {
-				super.onClick();
-				if (previousVersion == 0 || SPDSettings.intro()){
-					SPDSettings.version(ShatteredPixelDungeon.versionCode);
-					ShatteredPixelDungeon.switchScene(TitleScene.class);
-				} else {
+			super.onClick();
+			if (previousVersion == 0 || SPDSettings.intro()){
+				SPDSettings.version(ShatteredPixelDungeon.versionCode);
+				//与上游一致：非全新玩家（已有存档或完成记录）直接结束新手引导，避免 intro 残留反复隐藏 HUD
+				if (GamesInProgress.firstEmpty() != 1 || Rankings.INSTANCE.totalNumber > 0){
+					SPDSettings.intro(false);
+				}
+				ShatteredPixelDungeon.switchScene(TitleScene.class);
+			} else {
 					updateVersion(previousVersion);
 					ShatteredPixelDungeon.switchScene(TitleScene.class);
 				}

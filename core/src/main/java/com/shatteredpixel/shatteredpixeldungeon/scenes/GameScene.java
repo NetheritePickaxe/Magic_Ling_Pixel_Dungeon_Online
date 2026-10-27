@@ -2043,34 +2043,35 @@ public class GameScene extends PixelScene {
 
 		}
 
-		//Tutorial
-		if (SPDSettings.intro() || SPDSettings.HideScreen()){
-			if(SPDSettings.intro()) {
-				if (Document.ADVENTURERS_GUIDE.isPageFound(Document.GUIDE_INTRO)) {
-					GLog.p(Messages.get(GameScene.class, "tutorial_guidebook"));
-					flashForDocument(Document.ADVENTURERS_GUIDE, Document.GUIDE_INTRO);
+	//Tutorial
+	//intro 是全局持久标志，一旦残留会导致之后每次进入游戏都隐藏 HUD，故仅对从未开局的新玩家生效
+	boolean firstEverRun = GamesInProgress.firstEmpty() == 1 && Rankings.INSTANCE.totalNumber == 0;
+	if ((SPDSettings.intro() && firstEverRun) || SPDSettings.HideScreen()){
+		if(SPDSettings.intro()) {
+			//引导页未找到时也闪烁日志按钮，保证玩家有恢复 HUD 的可见入口
+			flashForDocument(Document.ADVENTURERS_GUIDE, Document.GUIDE_INTRO);
+			if (Document.ADVENTURERS_GUIDE.isPageFound(Document.GUIDE_INTRO)) {
+				GLog.p(Messages.get(GameScene.class, "tutorial_guidebook"));
+			} else {
+				if (ControllerHandler.isControllerConnected()) {
+					GLog.p(Messages.get(GameScene.class, "tutorial_move_controller"));
+				} else if (SPDSettings.interfaceSize() == 0) {
+					GLog.p(Messages.get(GameScene.class, "tutorial_move_mobile"));
 				} else {
-					if (ControllerHandler.isControllerConnected()) {
-						GLog.p(Messages.get(GameScene.class, "tutorial_move_controller"));
-					} else if (SPDSettings.interfaceSize() == 0) {
-						GLog.p(Messages.get(GameScene.class, "tutorial_move_mobile"));
-					} else {
-						GLog.p(Messages.get(GameScene.class, "tutorial_move_desktop"));
-					}
+					GLog.p(Messages.get(GameScene.class, "tutorial_move_desktop"));
 				}
 			}
-
-			toolbar.visible = toolbar.active = false;
-			status.visible = status.active = false;
-			if (inventory != null) inventory.visible = inventory.active = false;
 		}
+
+		applyHudVisibility(false);
+	}
 
 		if (Rankings.INSTANCE.totalNumber > 0 && !Document.ADVENTURERS_GUIDE.isPageRead(Document.GUIDE_DIEING)){
 			GLog.p(Messages.get(Guidebook.class, "hint"));
 			GameScene.flashForDocument(Document.ADVENTURERS_GUIDE, Document.GUIDE_DIEING);
 		}
 
-		if (!invVisible) toggleInvPane();
+		if (!invVisible && !SPDSettings.HideScreen()) toggleInvPane();
 		fadeIn();
 
 		//re-show WndResurrect if needed

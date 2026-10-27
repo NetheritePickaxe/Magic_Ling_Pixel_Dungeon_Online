@@ -422,6 +422,10 @@ public class MenuPane extends Component {
 		protected void onClick() {
 			time = 0;
 			keyIcon.am = journalIcon.am = 1;
+			//引导期间点击日志即结束引导、恢复 HUD（覆盖按钮未闪烁时点击的路径）
+			if (SPDSettings.intro()){
+				GameScene.endIntro();
+			}
 			if (flashingPage != null){
 				if (flashingDoc == Document.ALCHEMY_GUIDE){
 					WndJournal.last_index = 2;
