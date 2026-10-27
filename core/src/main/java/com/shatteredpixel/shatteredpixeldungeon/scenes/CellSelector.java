@@ -255,6 +255,11 @@ public class CellSelector extends ScrollArea {
 	private float heldDelay = 0f;
 	private boolean delayingForRelease = false;
 
+	//持续移动开启但灵敏度设为 0（不重复）时，仍保证按下能正常起步移动
+	private static float clampDelay(float d){
+		return d == Float.POSITIVE_INFINITY ? 0.06f : d;
+	}
+
 	private static float initialDelay(){
 		switch (SPDSettings.movementHoldSensitivity()){
 			case 0:
@@ -311,7 +316,7 @@ public class CellSelector extends ScrollArea {
 
 				//move from the action immediately if it was being delayed
 				// and another key wasn't recently released
-				if (heldDelay > 0f && !delayingForRelease){
+				if (heldDelay > 0f && !delayingForRelease && SPDSettings.movementKeyRepeat()){
 					heldDelay = 0f;
 					moveFromActions(action, heldAction1, heldAction2);
 				}
@@ -323,7 +328,9 @@ public class CellSelector extends ScrollArea {
 					delayingForRelease = true;
 					//in case more keys are being released
 					//note that this delay can tick down while the hero is moving
-					heldDelay = initialDelay();
+					heldDelay = SPDSettings.movementKeyRepeat()
+							? clampDelay(initialDelay())
+							: Float.POSITIVE_INFINITY;
 				}
 
 			} else if (!directionFromAction(action).isZero()) {
@@ -332,12 +339,20 @@ public class CellSelector extends ScrollArea {
 				lastCellMoved = -1;
 				if (heldAction1 == SPDAction.NONE){
 					heldAction1 = action;
-					heldDelay = initialDelay();
-					delayingForRelease = false;
 				} else if (heldAction2 == SPDAction.NONE){
 					heldAction2 = action;
 				} else {
 					heldAction3 = action;
+				}
+
+				if (!SPDSettings.movementKeyRepeat()){
+					//单步模式：按下立即移动一次，之后不重复、松开也不再补移动
+					moveFromActions(heldAction1, heldAction2, heldAction3);
+					delayingForRelease = true;
+					heldDelay = Float.POSITIVE_INFINITY;
+				} else {
+					delayingForRelease = false;
+					heldDelay = clampDelay(initialDelay());
 				}
 
 				return true;

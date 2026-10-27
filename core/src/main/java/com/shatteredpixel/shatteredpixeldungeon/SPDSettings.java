@@ -313,6 +313,7 @@ public class SPDSettings extends GameSettings {
 	public static final String KEY_SUPPORT_NAGGED = "support_nagged";
 	public static final String KEY_CONTROLLER_SENS = "controller_sens";
 	public static final String KEY_MOVE_SENS = "move_sens";
+	public static final String KEY_MOVE_REPEAT = "move_repeat";
 
 	public static final String KEY_ICECOIN = "iceGoldMagic2";
 
@@ -774,6 +775,15 @@ public class SPDSettings extends GameSettings {
 
 	public static int movementHoldSensitivity() {
 		return getInt(KEY_MOVE_SENS, 3, 0, 4);
+	}
+
+	//桌面端方向键/WASD 长按持续移动（关=长按只走一步，开=长按连续移动）
+	public static void movementKeyRepeat(boolean value) {
+		put(KEY_MOVE_REPEAT, value);
+	}
+
+	public static boolean movementKeyRepeat() {
+		return getBoolean(KEY_MOVE_REPEAT, false);
 	}
 
 	public static void Cheating(boolean value) {

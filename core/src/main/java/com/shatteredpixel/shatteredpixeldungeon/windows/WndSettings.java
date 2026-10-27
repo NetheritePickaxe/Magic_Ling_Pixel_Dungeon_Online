@@ -1164,7 +1164,7 @@ public class WndSettings extends WndTabbed {
 
 		CheckBox RTC_itch;
 
-		CheckBox hide_screen;
+		CheckBox moveRepeat;
 
 		@Override
 		protected void createChildren() {
@@ -1215,15 +1215,18 @@ public class WndSettings extends WndTabbed {
 			RTC_itch.checked(SPDSettings.UPos());
 			add(RTC_itch);
 
-			hide_screen = new CheckBox( Messages.get(this, "hide_screen") ) {
-				@Override
-				protected void onClick() {
-					super.onClick();
-					SPDSettings.HideScreen(checked());
-				}
-			};
-			hide_screen.checked(SPDSettings.HideScreen());
-			//add(hide_screen);
+			//桌面端：方向键/WASD 长按持续移动开关
+			if (isDesktop()) {
+				moveRepeat = new CheckBox(Messages.get(this, "move_repeat")) {
+					@Override
+					protected void onClick() {
+						super.onClick();
+						SPDSettings.movementKeyRepeat(checked());
+					}
+				};
+				moveRepeat.checked(SPDSettings.movementKeyRepeat());
+				add(moveRepeat);
+			}
 		}
 
 		@Override
@@ -1242,17 +1245,21 @@ public class WndSettings extends WndTabbed {
 				ATBSwitch.setRect(0, LockFing.bottom() + GAP, width/2, SLIDER_HEIGHT);
 				VSBwitch.setRect(width/2, LockFing.bottom() + GAP, width/2, SLIDER_HEIGHT);
 				RTC_itch.setRect(0, VSBwitch.bottom() + GAP, width, SLIDER_HEIGHT);
-				hide_screen.setRect(0, RTC_itch.bottom() + GAP, width, SLIDER_HEIGHT);
+				if (moveRepeat != null) {
+					moveRepeat.setRect(0, RTC_itch.bottom() + GAP, width, SLIDER_HEIGHT);
+				}
 			} else {
 				LockFing.setRect(0, bottom + GAP, width, SLIDER_HEIGHT);
 				ATBSwitch.setRect(0, LockFing.bottom() + GAP, width, SLIDER_HEIGHT);
 				VSBwitch.setRect(0, ATBSwitch.bottom() + GAP, width, SLIDER_HEIGHT);
 				RTC_itch.setRect(0, VSBwitch.bottom() + GAP, width, SLIDER_HEIGHT);
-				hide_screen.setRect(0, RTC_itch.bottom() + GAP, width, SLIDER_HEIGHT);
+				if (moveRepeat != null) {
+					moveRepeat.setRect(0, RTC_itch.bottom() + GAP, width, SLIDER_HEIGHT);
+				}
 			}
 
 
-			height = RTC_itch.bottom();
+			height = (moveRepeat != null ? moveRepeat.bottom() : RTC_itch.bottom());
 		}
 
 	}
