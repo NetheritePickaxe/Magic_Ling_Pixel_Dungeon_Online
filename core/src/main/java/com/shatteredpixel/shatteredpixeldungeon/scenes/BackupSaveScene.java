@@ -27,6 +27,7 @@ import com.shatteredpixel.shatteredpixeldungeon.utils.DungeonSeed;
 import com.shatteredpixel.shatteredpixeldungeon.windows.IconTitle;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndMessage;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndOptions;
+import com.shatteredpixel.shatteredpixeldungeon.windows.WndTextInput;
 import com.watabou.input.KeyBindings;
 import com.watabou.noosa.Camera;
 import com.watabou.noosa.Game;
@@ -64,7 +65,7 @@ import javax.swing.filechooser.FileNameExtensionFilter;
  *   <li>列出备份目录下所有 .mlsp 备份文件（按修改时间倒序，最新在前）</li>
  *   <li>将某个存档槽位（Slot 1~6）导出为 .mlsp 压缩备份文件</li>
  *   <li>将 .mlsp 备份文件导入到指定存档槽位（导入前会清空目标槽位旧数据）</li>
- *   <li>删除单个备份、清除全部备份、以及打开备份目录（桌面端）</li>
+ *   <li>删除单个备份、重命名备份、清除全部备份、以及打开备份目录（桌面端）</li>
  * </ul>
  *
  * <p>.mlsp 本质是一个 ZIP 压缩包，内部存放该存档槽位目录下的全部 .dat 存档数据文件。</p>
@@ -95,6 +96,9 @@ public class BackupSaveScene extends PixelScene {
     /** 局内存档备份的文件名前缀，用于与全局备份的 whole-save 前缀区分 */
     public static final String SLOT_PREFIX = "slot";
 
+    /** 自动备份（开放联机前）的文件名前缀 */
+    public static final String AUTO_PREFIX = "SP-";
+
     /** 场景 UI 的边距常量（像素） */
     private static final int MARGIN = 8;
 
@@ -104,6 +108,11 @@ public class BackupSaveScene extends PixelScene {
     /** 备份文件修改时间的格式化器：yyyy-MM-dd HH:mm，使用系统默认时区 */
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter
             .ofPattern("yyyy-MM-dd HH:mm")
+            .withZone(ZoneId.systemDefault());
+
+    /** 文件名里的时间戳：每次备份都生成新文件，同一槽位可无限备份 */
+    private static final DateTimeFormatter FILE_STAMP = DateTimeFormatter
+            .ofPattern("yyyyMMdd-HHmmss")
             .withZone(ZoneId.systemDefault());
 
     /**
@@ -381,7 +390,7 @@ public class BackupSaveScene extends PixelScene {
      * <ol>
      *   <li>检查目标槽位是否存在存档，空槽直接提示并返回</li>
      *   <li>确保备份目录存在（不存在则创建）</li>
-     *   <li>按「slot{槽位}-{种子代码}.mlsp」的规则生成文件名</li>
+     *   <li>按「slot{槽位}-{种子代码}-{时间戳}.mlsp」的规则生成文件名（同一槽位可无限次备份）</li>
      *   <li>将该槽位目录下所有 .dat 文件打包写入 ZIP（即 .mlsp 文件）</li>
      *   <li>弹出导出成功提示并刷新场景</li>
      * </ol>
@@ -390,83 +399,81 @@ public class BackupSaveScene extends PixelScene {
      */
     public static void exportSlotToMLSP(int slot) {
         // 检查该槽位是否有存档，空槽不允许导出 「该槽位没有正在进行的存档，无法备份。」
-        GamesInProgress.Info saveInfo = GamesInProgress.check(slot);
-        if (saveInfo == null) {
+        if (GamesInProgress.check(slot) == null) {
             ShatteredPixelDungeon.scene().addToFront(new WndMessage(Messages.get(BackupSaveScene.class, "export_empty_slot")));
             return;
         }
+        final String fileName;
         try {
-            // 存档数据目录与备份目录
-            String slotFolder = GamesInProgress.gameFolder(slot);
-            FileHandle backupDirHandle = Gdx.files.external(BACKUP_FOLDER);
-            if (!backupDirHandle.exists()) {
-                backupDirHandle.mkdirs(); // 首次导出时自动创建备份目录
-            }
-
-            // 文件名示例：slot1-DTK-KSC-PVS.mlsp（自定义种子用原文，非自定义的根据随机到的种子用对应的种子码）
-            // String.format是按格式拼接字符串，
-            // 第一个参数Locale.US指的是按美国格式，第二个参数是预设计的格式，
-            // 第三个参数是存档的槽位编号，第四个参数是种子码并将不符合windows文件命名规范的字符替换为下划线且当名字只剩下划线时返回unknown作为文件名，
-            // 第五个参数是我们设定的备份存档文件的拓展名
-            // 这里需要具体讲讲命名相关的东西，只是作为知识补充：
-            // 其一：这里我们加了个前缀“slot%d-”，
-            //      倘若不加这个前缀可能导致一些Windows操作系统保留名被作为文件名命名出来，这会导致输出文件经历各种乱七八糟的情况
-            //      以nul为例，Windows大小写不敏感，如果种子名为nul，Windows操作系统比对保留字时拓展名不参与比对，这样命名就命中了保留字NUL
-            //      后果分两种：现代 Windows 会直接拒绝创建；
-            //      但更阴险的是历史行为——NUL 设备会「接受」写入并把数据丢进黑洞，写操作看起来成功了，实际什么都没留下。这类问题排查起来非常费劲。
-            // 其二：Windows会自动删除文件末尾的“.”和“ ”（空格），而且不报告，不过我们这里末尾自动加了个“.mlpd”所以没事
-            // 其三：同一个字符在Unicode编码中存在多种等价的码点写法，比如NFC、NFD，而各个平台的处理方式又不相同，会遇到各种难以预测的问题，
-            //      而编码值不同的同一个字符其equal方法返回的结果往往是false，所以输入的文件名与其对应的预期编码值可能是有出入的，所以设计特定文字组成特定预设键时需要注意这个问题
-            //      当然，这里由于没有这个需求，所以不会遇到这个问题
-            String fileName = String.format(Locale.US, "slot%d-%s%s", slot, sanitizeForFileName(seedText(saveInfo)), MLSP_EXT);
-            FileHandle mlspHandle = backupDirHandle.child(fileName);
-
-            // 以 ZIP 方式写出 .mlsp 文件：只打包该槽位目录下扩展名为 .dat 的数据文件
-            // mlspHandle.write(false) 以覆写方式打开一个文件，返回值为一个输出流（OutputStream）指向我们先前定义的存档文件，这会覆盖旧备份文件，若再在写过程中发生异常则会破坏旧备份
-            // ZipOutputStream是将此赋予此输出流以zip的语义，能记住当前在写哪个条目、对每个条目做DEFAULT压缩、在 close() 时补写中央目录和结束记录（所以必须关否则会丢失部分标识性内容）
-            try (ZipOutputStream zos = new ZipOutputStream(mlspHandle.write(false))) {
-                // 打开存档文件夹记录其中的每个文件的文件名（当然也包括子文件夹）
-                ArrayList<String> fileList = FileUtils.filesInDir(slotFolder);
-                // 遍历存档文件夹里的每个文件
-                for (String fname : fileList) {
-                    // 只对.dat文件做操作，这一般是存储数据的文件
-                    if (fname.endsWith(".dat")) {
-                        // 因为只有文件名，所以要根据文件名补全文件路径
-                        String fullPath = slotFolder + "/" + fname;
-                        // 根据补全的文件路径打开文件
-                        FileHandle datHandle = FileUtils.getFileHandle(fullPath);
-                        // 读取并存储数据到data变量
-                        byte[] data = datHandle.readBytes();
-
-                        // 每个 .dat 文件作为一个 ZIP 条目写入，条目名沿用原文件名
-                        ZipEntry entry = new ZipEntry(fname);
-                        // 打开条目
-                        zos.putNextEntry(entry);
-                        // 写条目
-                        zos.write(data);
-                        // 关闭条目
-                        zos.closeEntry();
-                    }
-                }
-            }
-
-            // 重建一个界面并重新显示但不播放切换界面动画，也许可以改为局部重建
-            ShatteredPixelDungeon.switchNoFade(BackupSaveScene.class, new Game.SceneChangeCallback() {
-                @Override public void beforeCreate() { }
-
-                @Override public void afterCreate() {
-                    // 导出成功提示 「备份已创建：%s」
-                    ShatteredPixelDungeon.scene().addToFront(
-                            new WndMessage(Messages.get(BackupSaveScene.class, "export_success", fileName)));
-                }
-            });
-        // 这里我将异常捕获对象从IOException替换成了Exception e
+            fileName = writeSlotToMLSP(slot, "");
         } catch (Exception e) {
-            // 导出失败：上报异常并提示
             ShatteredPixelDungeon.reportException(e);
             // 「导出失败！」
             ShatteredPixelDungeon.scene().addToFront(new WndMessage(Messages.get(BackupSaveScene.class, "export_fail")));
+            return;
         }
+        // 重建一个界面并重新显示但不播放切换界面动画，也许可以改为局部重建
+        ShatteredPixelDungeon.switchNoFade(BackupSaveScene.class, new Game.SceneChangeCallback() {
+            @Override public void beforeCreate() { }
+
+            @Override public void afterCreate() {
+                // 导出成功提示 「备份已创建：%s」
+                ShatteredPixelDungeon.scene().addToFront(
+                        new WndMessage(Messages.get(BackupSaveScene.class, "export_success", fileName)));
+            }
+        });
+    }
+
+    /**
+     * 把某个存档槽位打包成 .mlsp，返回生成的文件名；失败时抛异常。
+     * <p>文件名带时间戳，同一个槽位可以无限次备份，不会互相覆盖。不弹窗、不切换场景，
+     * 供存档界面与「开放联机前的自动备份」复用。</p>
+     *
+     * @param slot   存档槽位编号
+     * @param prefix 文件名前缀（自动备份用 {@link #AUTO_PREFIX}，手动导出传空串）
+     */
+    public static String writeSlotToMLSP(int slot, String prefix) throws Exception {
+        GamesInProgress.Info saveInfo = GamesInProgress.check(slot);
+        if (saveInfo == null) throw new IOException("empty slot " + slot);
+
+        // 存档数据目录与备份目录
+        String slotFolder = GamesInProgress.gameFolder(slot);
+        FileHandle backupDirHandle = Gdx.files.external(BACKUP_FOLDER);
+        if (!backupDirHandle.exists()) {
+            backupDirHandle.mkdirs(); // 首次导出时自动创建备份目录
+        }
+
+        // 文件名示例：SLOT_PREFIX + slot1 + 种子码 + 时间戳，如 slot1-DTK-KSC-PVS-20261027-204500.mlsp
+        // 前缀除了区分备份类型，也避免种子名正好撞上 Windows 保留名（如 nul）；
+        // 种子文本会先经过 sanitizeForFileName 白名单过滤，末尾的 .mlsp 也避免了以点/空格结尾的问题
+        String base = String.format(Locale.US, "%s%s%d-%s-%s",
+                prefix == null ? "" : prefix, SLOT_PREFIX, slot,
+                sanitizeForFileName(seedText(saveInfo)),
+                FILE_STAMP.format(Instant.now()));
+        // 同一秒内重复备份时追加序号，保证永远不会覆盖已有备份
+        FileHandle mlspHandle = backupDirHandle.child(base + MLSP_EXT);
+        for (int n = 2; mlspHandle.exists() && n < 100; n++) {
+            mlspHandle = backupDirHandle.child(base + "-" + n + MLSP_EXT);
+        }
+        String fileName = mlspHandle.name();
+
+        // 以 ZIP 方式写出 .mlsp 文件：只打包该槽位目录下扩展名为 .dat 的数据文件
+        try (ZipOutputStream zos = new ZipOutputStream(mlspHandle.write(false))) {
+            // 打开存档文件夹记录其中的每个文件的文件名
+            ArrayList<String> fileList = FileUtils.filesInDir(slotFolder);
+            for (String fname : fileList) {
+                // 只对.dat文件做操作，这一般是存储数据的文件
+                if (fname.endsWith(".dat")) {
+                    FileHandle datHandle = FileUtils.getFileHandle(slotFolder + "/" + fname);
+                    // 每个 .dat 文件作为一个 ZIP 条目写入，条目名沿用原文件名
+                    zos.putNextEntry(new ZipEntry(fname));
+                    zos.write(datHandle.readBytes());
+                    zos.closeEntry();
+                }
+            }
+        }
+
+        return fileName;
     }
 
     /**
@@ -475,7 +482,7 @@ public class BackupSaveScene extends PixelScene {
      * <p>局外存档导出流程：</p>
      * <ol>
      *   <li>确保备份目录存在（不存在则创建）</li>
-     *   <li>按「whole-save.mlsp」的规则生成文件名</li>
+     *   <li>按「whole-save-{时间戳}.mlsp」的规则生成文件名（可重复备份）</li>
      *   <li>将该目录下所有 .dat 文件打包写入 ZIP（即 .mlsp 文件）</li>
      *   <li>弹出导出成功提示并刷新场景</li>
      * </ol>
@@ -487,8 +494,9 @@ public class BackupSaveScene extends PixelScene {
                 backupDirHandle.mkdirs();
             }
 
-            // 文件名示例：whole-save.mlsp
-            String fileName = String.format(Locale.US, "%s%s", GLOBAL_PREFIX, MLSP_EXT);
+            // 文件名示例：whole-save-20261027-204500.mlsp（带时间戳，可重复备份）
+            String fileName = String.format(Locale.US, "%s-%s%s",
+                    GLOBAL_PREFIX, FILE_STAMP.format(Instant.now()), MLSP_EXT);
             FileHandle mlspHandle = backupDirHandle.child(fileName);
 
             try (ZipOutputStream zos = new ZipOutputStream(mlspHandle.write(false))) {
@@ -740,8 +748,19 @@ public class BackupSaveScene extends PixelScene {
                     Messages.get(BackupSaveScene.class, "import_fail_unknownfile")));
             return;
         }
+        //自动备份（SP- 前缀）本质是槽位备份，比较前缀前先去掉它
+        String name = backupFile.name();
+        if (name.startsWith(AUTO_PREFIX)) name = name.substring(AUTO_PREFIX.length());
+
+        //前缀被改掉（重命名）时按包内容判断：带 settings.xml 的是局外存档，只有 .dat 的是槽位存档
+        int[] peek = name.startsWith(GLOBAL_PREFIX) || name.startsWith(SLOT_PREFIX)
+                ? null : peekBackup(backupFile);
+        boolean globalBackup = name.startsWith(GLOBAL_PREFIX) || (peek != null && peek[0] > 0);
+        boolean slotBackup = name.startsWith(SLOT_PREFIX)
+                || (peek != null && peek[0] == 0 && peek[1] > 0);
+
         // 全局存档分流
-        if (backupFile.name().startsWith(GLOBAL_PREFIX)) {
+        if (globalBackup) {
             ShatteredPixelDungeon.scene().addToFront(new WndOptions(
                     Icons.get(Icons.WARNING),
                     Messages.get(BackupSaveScene.class, "warn_overwrite_title"),
@@ -756,7 +775,7 @@ public class BackupSaveScene extends PixelScene {
             });
         }
         // 局内存档分流
-        else if (backupFile.name().startsWith(SLOT_PREFIX)) {
+        else if (slotBackup) {
             // ---- 导入备份：先选择目标槽位（Slot1~6），再二次确认覆盖 ----
             ShatteredPixelDungeon.scene().add(new WndOptions(
                     Icons.get(Icons.WARNING),
@@ -793,6 +812,27 @@ public class BackupSaveScene extends PixelScene {
         else {
             ShatteredPixelDungeon.scene().addToFront(new WndMessage(Messages.get(BackupSaveScene.class, "import_fail_unknownfile")));
         }
+    }
+
+    /**
+     * 探包：返回 [是否含 settings.xml, .dat 条目数]。
+     * 备份被重命名后前缀丢失，靠它区分「局外存档」与「槽位存档」。
+     */
+    private static int[] peekBackup(FileHandle file) {
+        int[] stat = new int[2];
+        try (InputStream in = file.read(); ZipInputStream zis = new ZipInputStream(in)) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                if (entry.getName().equals("settings.xml")) {
+                    stat[0] = 1;
+                } else if (entry.getName().endsWith(".dat")) {
+                    stat[1]++;
+                }
+            }
+        } catch (Exception e) {
+            ShatteredPixelDungeon.reportException(e);
+        }
+        return stat;
     }
 
     /** 清空全局数据的缓存文件 */
@@ -1282,6 +1322,69 @@ public class BackupSaveScene extends PixelScene {
     }
 
     /**
+     * 内部弹窗 3：重命名备份文件（WndRenameBackup）。
+     * <p>只改文件名，扩展名沿用 .mlsp；含非法字符或与已有备份重名时提示并保持原文件不变。</p>
+     */
+    public static class WndRenameBackup extends WndTextInput {
+
+        private final BackupFile backup;
+
+        public WndRenameBackup(BackupFile backup) {
+            super(Messages.get(BackupSaveScene.class, "rename_backup"),
+                    Messages.get(BackupSaveScene.class, "rename_body"),
+                    stripExt(backup.fileName),
+                    48,
+                    false,
+                    Messages.get(BackupSaveScene.class, "confirm"),
+                    Messages.get(BackupSaveScene.class, "cancel"));
+            this.backup = backup;
+        }
+
+        @Override
+        public void onSelect(boolean positive, String text) {
+            if (!positive) return;
+
+            String name = text == null ? "" : text.trim();
+            if (!validName(name)) {
+                ShatteredPixelDungeon.scene().addToFront(new WndMessage(
+                        Messages.get(BackupSaveScene.class, "rename_invalid")));
+                return;
+            }
+
+            FileHandle target = backup.file.parent().child(name + MLSP_EXT);
+            if (target.exists()) {
+                ShatteredPixelDungeon.scene().addToFront(new WndMessage(
+                        Messages.get(BackupSaveScene.class, "rename_exists")));
+                return;
+            }
+
+            try {
+                backup.file.moveTo(target);
+            } catch (Exception e) {
+                ShatteredPixelDungeon.reportException(e);
+                ShatteredPixelDungeon.scene().addToFront(new WndMessage(
+                        Messages.get(BackupSaveScene.class, "rename_fail")));
+                return;
+            }
+            // 刷新列表
+            ShatteredPixelDungeon.switchNoFade(BackupSaveScene.class);
+        }
+
+        private static String stripExt(String fileName) {
+            return fileName.endsWith(MLSP_EXT)
+                    ? fileName.substring(0, fileName.length() - MLSP_EXT.length())
+                    : fileName;
+        }
+
+        /** 文件名校验：禁止路径分隔符与 Windows 保留字符，也不允许以点或空格结尾 */
+        private static boolean validName(String name) {
+            if (name.isEmpty() || name.length() > 48) return false;
+            if (name.endsWith(".") || name.endsWith(" ")) return false;
+            return name.matches("[^\\\\/:*?\"<>|\\p{Cntrl}]+");
+        }
+    }
+
+    /**
      * 备份文件实体：封装单个 .mlsp 备份文件的名称、文件句柄与最后修改时间。
      * <p><font color="green"><b><h3>备份文件类</h3></b></font></p>
      */
@@ -1424,6 +1527,7 @@ public class BackupSaveScene extends PixelScene {
                     backup.fileName, // 标题为备份文件名
                     Messages.get(BackupSaveScene.class, "backup_options"),
                     Messages.get(BackupSaveScene.class, "import_backup"),
+                    Messages.get(BackupSaveScene.class, "rename_backup"),
                     Messages.get(BackupSaveScene.class, "extract_file"), // 提取文件
                     Messages.get(BackupSaveScene.class, "delete_backup"),
                     Messages.get(BackupSaveScene.class, "cancel")
@@ -1434,13 +1538,16 @@ public class BackupSaveScene extends PixelScene {
                     {
                         startImportFlow(backup.file);
                     } else if (index == 1) {
+                        // ---- 重命名：只改文件名，.mlsp 扩展名保留 ----
+                        ShatteredPixelDungeon.scene().addToFront(new WndRenameBackup(backup));
+                    } else if (index == 2) {
                         // ---- 提取文件：桌面端打开该备份所在目录 ----
                         boolean ok = openDirectory(backup.file.parent());
                         if (!ok) {
                             // 打开失败（如移动端）给出提示
                             ShatteredPixelDungeon.scene().addToFront(new WndMessage(Messages.get(BackupSaveScene.class, "extract_fail")));
                         }
-                    } else if (index == 2) {
+                    } else if (index == 3) {
                         // ---- 删除备份：确认后删除文件并刷新场景 ----
                         ShatteredPixelDungeon.scene().add(new WndOptions(
                                 Icons.get(Icons.WARNING),
